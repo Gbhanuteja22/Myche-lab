@@ -1,22 +1,27 @@
-<<<<<<< HEAD
-# ui.py (Refined UI and Prediction Format for Virtual Chemistry Lab)
+# ui.py
 import tkinter as tk
 from tkinter import simpledialog, messagebox, filedialog
 from chemistry import elements
 from ai_engine import ask_gemini
 import re
+from PIL import Image, ImageTk
+import os
 
 class VirtualLabApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("AI-Powered Virtual Chemistry Lab")
-        self.root.geometry("1220x700")
+        self.root.geometry("1400x800")
 
-        self.left_frame = tk.Frame(self.root, width=250, bg='white')
+        # Left area with only Beaker
+        self.left_frame = tk.Frame(self.root, width=200, bg='white')
         self.left_frame.pack(side=tk.LEFT, fill=tk.Y)
 
-        self.canvas = tk.Canvas(self.root, bg='white')
-        self.canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.canvas = tk.Canvas(self.left_frame, bg='white', width=200)
+        self.canvas.pack(fill=tk.BOTH, expand=True)
+
+        self.center_frame = tk.Frame(self.root, bg='white', width=500)
+        self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
         self.sidebar = tk.Frame(self.root, width=280, bg='lightgrey')
         self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
@@ -27,46 +32,48 @@ class VirtualLabApp:
         self.element_texts = []
         self.element_weights = {}
 
-        self.load_lab_equipment()
+        self.predicted_image_label = None
+
+        self.load_beaker_only()
         self.build_periodic_table()
         self.build_prediction_output()
 
-    def load_lab_equipment(self):
-        items = ["beaker", "test_tube", "burner", "cooler"]
-        for i, name in enumerate(items):
-            x, y = 30, 100 + i * 120
-            rect = self.canvas.create_rectangle(x, y, x+100, y+100, fill="lightblue", tags=("draggable", name))
-            text = self.canvas.create_text(x+50, y+50, text=name.replace("_", " ").title(), tags="draggable")
-            self.lab_items[name] = rect
+    def load_beaker_only(self):
+        name = "beaker"
+        x, y = 50, 200
+        rect = self.canvas.create_rectangle(x, y, x+100, y+100, fill="lightblue", tags=("draggable", name))
+        text = self.canvas.create_text(x+50, y+50, text=name.title(), tags="draggable")
+        self.lab_items[name] = rect
 
         self.canvas.tag_bind("draggable", "<ButtonPress-1>", self.on_start)
         self.canvas.tag_bind("draggable", "<B1-Motion>", self.on_drag)
         self.canvas.tag_bind("draggable", "<ButtonRelease-1>", self.on_drop)
 
     def build_periodic_table(self):
-        tk.Label(self.sidebar, text="Periodic Table", bg="lightgrey", font=("Arial", 14, "bold")).pack(pady=10)
+        tk.Label(self.sidebar, text="Periodic Table", bg="lightgrey", font=("Arial", 14, "bold")).pack(pady=15)
 
         self.element_listbox = tk.Listbox(self.sidebar, selectmode=tk.MULTIPLE, width=25)
         for symbol, data in elements.items():
             self.element_listbox.insert(tk.END, f"{symbol} - {data['name']}")
         self.element_listbox.pack(pady=10)
 
-        tk.Button(self.sidebar, text="Add to Beaker", command=self.add_elements_to_beaker).pack(pady=5)
-        tk.Button(self.sidebar, text="Predict Compound", command=self.predict_compound).pack(pady=5)
-        tk.Button(self.sidebar, text="Clear Beaker", command=self.clear_beaker).pack(pady=5)
-        tk.Button(self.sidebar, text="Reset Elements", command=self.reset_elements).pack(pady=5)
-        tk.Button(self.sidebar, text="Export Prediction", command=self.export_result).pack(pady=5)
+        spacing = 10
+        tk.Button(self.sidebar, text="Add to Beaker", command=self.add_elements_to_beaker).pack(pady=spacing)
+        tk.Button(self.sidebar, text="Predict Compound", command=self.predict_compound).pack(pady=spacing)
+        tk.Button(self.sidebar, text="Clear Beaker", command=self.clear_beaker).pack(pady=spacing)
+        tk.Button(self.sidebar, text="Reset Elements", command=self.reset_elements).pack(pady=spacing)
+        tk.Button(self.sidebar, text="Export Prediction", command=self.export_result).pack(pady=spacing)
 
         self.selected_label = tk.Label(self.sidebar, text="Selected: None", bg="lightgrey", wraplength=260, justify=tk.LEFT)
-        self.selected_label.pack(pady=8)
+        self.selected_label.pack(pady=15)
 
     def build_prediction_output(self):
-        self.prediction_frame = tk.Frame(self.root, bg='lightgrey', width=400)
-        self.prediction_frame.pack(side=tk.RIGHT, fill=tk.Y)
+        tk.Label(self.center_frame, text="Prediction Output", bg="white", font=("Arial", 14, "bold")).pack(pady=15)
+        self.prediction_output = tk.Text(self.center_frame, wrap=tk.WORD, height=20, width=60)
+        self.prediction_output.pack(padx=10, pady=10)
 
-        tk.Label(self.prediction_frame, text="Prediction Output", bg="lightgrey", font=("Arial", 14, "bold")).pack(pady=10)
-        self.prediction_output = tk.Text(self.prediction_frame, wrap=tk.WORD, height=30, width=50)
-        self.prediction_output.pack(padx=10, pady=5)
+        self.predicted_image_label = tk.Label(self.center_frame, bg="white")
+        self.predicted_image_label.pack(pady=10)
 
     def add_elements_to_beaker(self):
         selected_indices = self.element_listbox.curselection()
@@ -136,9 +143,25 @@ class VirtualLabApp:
             clean = self.clean_text(result)
             self.prediction_output.delete(1.0, tk.END)
             self.prediction_output.insert(tk.END, clean)
+            self.update_image_if_available(clean)
         except Exception as e:
             self.prediction_output.delete(1.0, tk.END)
             self.prediction_output.insert(tk.END, f"Error: {e}")
+
+    def update_image_if_available(self, text):
+        keyword = "glucose" if "C6H12O6" in text or "dextrose" in text.lower() else None
+        image_map = {
+            "glucose": "glucose.png"
+        }
+        if keyword and os.path.exists(image_map[keyword]):
+            img = Image.open(image_map[keyword])
+            img = img.resize((200, 200))
+            tk_img = ImageTk.PhotoImage(img)
+            self.predicted_image_label.config(image=tk_img)
+            self.predicted_image_label.image = tk_img
+        else:
+            self.predicted_image_label.config(image=None)
+            self.predicted_image_label.image = None
 
     def export_result(self):
         result = self.prediction_output.get(1.0, tk.END).strip()
@@ -159,6 +182,8 @@ class VirtualLabApp:
         self.selected_elements = []
         self.element_weights.clear()
         self.selected_label.config(text="Selected: None")
+        self.predicted_image_label.config(image=None)
+        self.predicted_image_label.image = None
 
     def reset_elements(self):
         self.element_listbox.selection_clear(0, tk.END)
@@ -191,60 +216,3 @@ class VirtualLabApp:
 if __name__ == "__main__":
     app = VirtualLabApp()
     app.run()
-=======
-# ui.py
-import pygame
-import sys
-
-# Set screen size
-WIDTH, HEIGHT = 1200, 700
-FPS = 60
-
-# Define colors
-WHITE = (255, 255, 255)
-BLUE = (100, 180, 255)
-BLACK = (0, 0, 0)
-
-# Lab items info
-lab_items = [
-    {"name": "Beaker", "rect": pygame.Rect(50, 100, 100, 100)},
-    {"name": "Test Tube", "rect": pygame.Rect(50, 250, 100, 100)},
-    {"name": "Burner", "rect": pygame.Rect(50, 400, 100, 100)},
-    {"name": "Cooler", "rect": pygame.Rect(50, 550, 100, 100)},
-]
-
-class VirtualLabApp:
-    def __init__(self):
-        pygame.init()
-        self.screen = pygame.display.set_mode((WIDTH, HEIGHT))
-        pygame.display.set_caption("Virtual Chemistry Lab")
-        self.clock = pygame.time.Clock()
-        self.dragging = None
-        self.offset_x = 0
-        self.offset_y = 0
-
-    def draw_lab(self):
-        self.screen.fill(WHITE)
-        font = pygame.font.SysFont(None, 24)
-
-        for item in lab_items:
-            pygame.draw.rect(self.screen, BLUE, item["rect"])
-            label = font.render(item["name"], True, BLACK)
-            label_rect = label.get_rect(center=item["rect"].center)
-            self.screen.blit(label, label_rect)
-
-    def run(self):
-        while True:
-            self.clock.tick(FPS)
-
-            for event in pygame.event.get():
-                if event.type == pygame.QUIT:
-                    pygame.quit()
-                    sys.exit()
-
-                elif event.type == pygame.MOUSEBUTTONDOWN:
-                    for item in lab_items:
-                        if item["rect"].collidepoint(event.pos):
-                            self.dragging = item
-                            mouse_x, mouse_y = event.pos
->>>>>>> 5c56e6b6e88124ef899939bed63bc8941b32d074
