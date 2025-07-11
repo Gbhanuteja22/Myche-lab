@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # # ai_engine.py — Handles interaction with Gemini API
 # import os
 # import google.generativeai as genai
@@ -35,11 +36,17 @@
 import os
 import requests
 import json
+=======
+# ai_engine.py
+import os
+import requests
+>>>>>>> 5c56e6b6e88124ef899939bed63bc8941b32d074
 from dotenv import load_dotenv
 
 load_dotenv()
 
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+<<<<<<< HEAD
 MODEL_NAME = "models/gemini-2.5-pro"
 GEMINI_URL = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-pro:generateContent"
 
@@ -68,4 +75,15 @@ def ask_gemini(prompt):
     if response.status_code != 200:
         raise Exception(f"Gemini API Error {response.status_code}: {response.text}")
 
+=======
+GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=" + GEMINI_API_KEY
+
+def ask_gemini(question: str):
+    data = {
+        "contents": [{
+            "parts": [{"text": question}]
+        }]
+    }
+    response = requests.post(GEMINI_URL, json=data)
+>>>>>>> 5c56e6b6e88124ef899939bed63bc8941b32d074
     return response.json()["candidates"][0]["content"]["parts"][0]["text"]
