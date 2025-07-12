@@ -3,5 +3,5 @@ opencv-python
 mediapipe
 google-generativeai
 python-dotenv
-requests
-pillow
+fpdf
+Pillow

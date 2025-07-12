@@ -1,4 +1,3 @@
-# ui.py
 import tkinter as tk
 from tkinter import simpledialog, messagebox, filedialog
 from chemistry import elements
@@ -11,26 +10,24 @@ class VirtualLabApp:
     def __init__(self):
         self.root = tk.Tk()
         self.root.title("AI-Powered Virtual Chemistry Lab")
-        self.root.geometry("1400x800")
+        self.root.geometry("1600x850")
 
-        # Left area with only Beaker
-        self.left_frame = tk.Frame(self.root, width=200, bg='white')
+        self.left_frame = tk.Frame(self.root, width=220, bg='white')
         self.left_frame.pack(side=tk.LEFT, fill=tk.Y)
 
-        self.canvas = tk.Canvas(self.left_frame, bg='white', width=200)
+        self.canvas = tk.Canvas(self.left_frame, bg='white', width=220)
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
-        self.center_frame = tk.Frame(self.root, bg='white', width=500)
+        self.center_frame = tk.Frame(self.root, width=600, bg='white')
         self.center_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        self.sidebar = tk.Frame(self.root, width=280, bg='lightgrey')
+        self.sidebar = tk.Frame(self.root, width=400, bg='lightgrey')
         self.sidebar.pack(side=tk.LEFT, fill=tk.Y)
 
         self.lab_items = {}
         self.drag_data = {"item": None, "x": 0, "y": 0}
-        self.selected_elements = []
+        self.selected_elements = {}
         self.element_texts = []
-        self.element_weights = {}
 
         self.predicted_image_label = None
 
@@ -40,7 +37,7 @@ class VirtualLabApp:
 
     def load_beaker_only(self):
         name = "beaker"
-        x, y = 50, 200
+        x, y = 60, 200
         rect = self.canvas.create_rectangle(x, y, x+100, y+100, fill="lightblue", tags=("draggable", name))
         text = self.canvas.create_text(x+50, y+50, text=name.title(), tags="draggable")
         self.lab_items[name] = rect
@@ -52,24 +49,28 @@ class VirtualLabApp:
     def build_periodic_table(self):
         tk.Label(self.sidebar, text="Periodic Table", bg="lightgrey", font=("Arial", 14, "bold")).pack(pady=15)
 
-        self.element_listbox = tk.Listbox(self.sidebar, selectmode=tk.MULTIPLE, width=25)
+        listbox_container = tk.Frame(self.sidebar, bg="lightgrey")
+        listbox_container.pack(pady=5, padx=20)
+
+        self.element_listbox = tk.Listbox(listbox_container, selectmode=tk.MULTIPLE, width=32)
         for symbol, data in elements.items():
             self.element_listbox.insert(tk.END, f"{symbol} - {data['name']}")
-        self.element_listbox.pack(pady=10)
+        self.element_listbox.pack(padx=5)
 
-        spacing = 10
-        tk.Button(self.sidebar, text="Add to Beaker", command=self.add_elements_to_beaker).pack(pady=spacing)
-        tk.Button(self.sidebar, text="Predict Compound", command=self.predict_compound).pack(pady=spacing)
-        tk.Button(self.sidebar, text="Clear Beaker", command=self.clear_beaker).pack(pady=spacing)
-        tk.Button(self.sidebar, text="Reset Elements", command=self.reset_elements).pack(pady=spacing)
-        tk.Button(self.sidebar, text="Export Prediction", command=self.export_result).pack(pady=spacing)
+        spacing = 16
+        btn_style = {"padx": 10, "pady": spacing}
 
-        self.selected_label = tk.Label(self.sidebar, text="Selected: None", bg="lightgrey", wraplength=260, justify=tk.LEFT)
-        self.selected_label.pack(pady=15)
+        tk.Button(self.sidebar, text="Add to Beaker", command=self.add_elements_to_beaker).pack(**btn_style)
+        tk.Button(self.sidebar, text="Predict Compound", command=self.predict_compound).pack(**btn_style)
+        tk.Button(self.sidebar, text="Clear Beaker", command=self.clear_beaker).pack(**btn_style)
+        tk.Button(self.sidebar, text="Export Prediction", command=self.export_result).pack(**btn_style)
+
+        self.selected_label = tk.Label(self.sidebar, text="Selected: None", bg="lightgrey", wraplength=350, justify=tk.LEFT)
+        self.selected_label.pack(pady=20)
 
     def build_prediction_output(self):
         tk.Label(self.center_frame, text="Prediction Output", bg="white", font=("Arial", 14, "bold")).pack(pady=15)
-        self.prediction_output = tk.Text(self.center_frame, wrap=tk.WORD, height=20, width=60)
+        self.prediction_output = tk.Text(self.center_frame, wrap=tk.WORD, height=22, width=70)
         self.prediction_output.pack(padx=10, pady=10)
 
         self.predicted_image_label = tk.Label(self.center_frame, bg="white")
@@ -77,14 +78,14 @@ class VirtualLabApp:
 
     def add_elements_to_beaker(self):
         selected_indices = self.element_listbox.curselection()
-        new_elements = [self.element_listbox.get(i).split(' - ')[0] for i in selected_indices]
-
-        for sym in new_elements:
+        for i in selected_indices:
+            sym = self.element_listbox.get(i).split(' - ')[0]
             count = simpledialog.askinteger("Atom Count", f"How many atoms of {sym}?", minvalue=1, initialvalue=1)
-            weight = simpledialog.askfloat("Optional: Weight", f"Weight for {sym}? (g, optional)", minvalue=0.0)
-            self.element_weights[sym] = {"count": count, "weight": weight if weight else None}
+            if sym in self.selected_elements:
+                self.selected_elements[sym] += count
+            else:
+                self.selected_elements[sym] = count
 
-        self.selected_elements = list(self.element_weights.keys())
         self.update_beaker_display()
 
     def update_beaker_display(self):
@@ -98,11 +99,8 @@ class VirtualLabApp:
 
         display_lines = []
 
-        for i, sym in enumerate(self.selected_elements):
-            data = self.element_weights[sym]
-            text = f"{sym} x{data['count']}"
-            if data['weight']:
-                text += f" ({data['weight']}g)"
+        for i, (sym, count) in enumerate(self.selected_elements.items()):
+            text = f"{sym} x{count}"
             display_lines.append(text)
             text_id = self.canvas.create_text(x, y - i * 20, text=text, fill="black", font=("Arial", 12))
             self.element_texts.append(text_id)
@@ -121,12 +119,8 @@ class VirtualLabApp:
             return
 
         prompt = "Given the following elements and their details:\n"
-        for sym in self.selected_elements:
-            data = self.element_weights[sym]
-            line = f"{sym} ({elements[sym]['name']}): {data['count']} atoms"
-            if data['weight']:
-                line += f", {data['weight']}g"
-            prompt += f"- {line}\n"
+        for sym, count in self.selected_elements.items():
+            prompt += f"- {sym} ({elements[sym]['name']}): {count} atoms\n"
 
         prompt += (
             "\nPredict the resulting compound (if any) and return only:\n"
@@ -169,7 +163,7 @@ class VirtualLabApp:
             messagebox.showerror("Error", "Nothing to export.")
             return
 
-        path = filedialog.asksaveasfilename(defaultextension=".txt")
+        path = filedialog.asksaveasfilename(defaultextension=".txt", filetypes=[("Text files", "*.txt")])
         if path:
             with open(path, 'w', encoding='utf-8') as f:
                 f.write(result)
@@ -179,16 +173,10 @@ class VirtualLabApp:
         for text_id in self.element_texts:
             self.canvas.delete(text_id)
         self.element_texts.clear()
-        self.selected_elements = []
-        self.element_weights.clear()
+        self.selected_elements.clear()
         self.selected_label.config(text="Selected: None")
         self.predicted_image_label.config(image=None)
         self.predicted_image_label.image = None
-
-    def reset_elements(self):
-        self.element_listbox.selection_clear(0, tk.END)
-        self.clear_beaker()
-        self.prediction_output.delete(1.0, tk.END)
 
     def on_start(self, event):
         item = self.canvas.find_closest(event.x, event.y)[0]

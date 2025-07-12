@@ -1,7 +1,8 @@
 .env
 __pycache__/
 *.pyc
-<<<<<<< HEAD
+gesture.py
+list_models.py
 
 # Virtual environment
 .venv/
@@ -23,5 +24,3 @@ run.txt
 # OS generated files
 .DS_Store
 Thumbs.db
-=======
->>>>>>> 5c56e6b6e88124ef899939bed63bc8941b32d074
